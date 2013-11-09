@@ -1,7 +1,7 @@
 #!/bin/bash
 
 mosesserver_cmd=${MOSES_ROOT}/bin/mosesserver 
-mosesserver_config=${MOSES_MODELS}/moses.ini
+mosesserver_config=${MOSES_MODELS}/moses.minimized.ini
 mosesserver_port=${MOSES_PORT}
 mosesserver_log=${MOSES_LOG}
 

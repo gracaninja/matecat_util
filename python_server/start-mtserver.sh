@@ -1,7 +1,7 @@
 #!/bin/bash
 
-SCRIPTS=${MTSERVER_ROOT}
 
+SCRIPTS=${MOSES_ROOT}/scripts
 server=${MTSERVER_ROOT}/python_server/server.py
 
 #parameters for the Moses server
@@ -18,7 +18,7 @@ tgt=${MTSERVER_TGTLNG}
 #pointers to scripts for pre- and post-processing
 tokenizer="$SCRIPTS/tokenizer/tokenizer.perl -b -X -l $src -a"
 detokenizer="$SCRIPTS/tokenizer/detokenizer.perl -b -l $tgt"
-verbose=1
+verbose=3
 logprefix=test
 
 #run command
@@ -29,5 +29,5 @@ python $server \
 	-slang $src -tlang $tgt \
 	-mosesurl $mosesurl \
 	-tokenizer "$tokenizer" \
-	-detokenizer "$detokenizer"
-
+	-detokenizer "$detokenizer" \
+        -logprefix $logprefix

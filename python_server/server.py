@@ -140,6 +140,8 @@ class Root(object):
         self.pretty = bool(pretty)
         self.timeout = timeout
         self.verbose = verbose
+        
+        self.prune_sg = True
 
     def _check_params(self, params):
         errors = []
@@ -333,11 +335,38 @@ class Root(object):
 
         return translationDict
 
+
+    def prune_search_graph(self,search_graph,n=10):
+        '''
+            Keep at most n_entries per spam
+        '''
+        entries_per_spam = {}
+        
+        for entry in search_graph:
+            cover_start = entry.get('cover-start',-1)
+            cover_end = entry.get('cover-end',-1)
+            spam = "%i-%i"%(cover_start,cover_end)
+            if spam not in entries_per_spam:
+                entries_per_spam[spam] = []
+            entries_per_spam[spam].append(entry)
+        
+        new_sg = []
+        for spam,entries in entries_per_spam.iteritems():
+            if len(entries) < 10:
+                new_sg.extend(entries)
+            else:
+                entries = sorted(entries,key=lambda x: x["fscore"]*x["score"],reverse=True)
+                new_sg.extend(entries[:10])
+        return new_sg
+    
+    
     @cherrypy.expose
+    @cherrypy.tools.gzip()
     def translate(self, **kwargs):
         response = cherrypy.response
         response.headers['Content-Type'] = 'application/json'
-
+        
+        
         errors = self._check_params(kwargs)
         if errors:
             cherrypy.response.status = 400
@@ -389,9 +418,12 @@ class Root(object):
         #print result.keys()
         translationDict.update(self._getTranslation(translation))
         translationDict["tokenization"].update( {'src' : src_spans} )
-
+        
         if 'sg' in result:
-            translationDict['searchGraph'] = result['sg']
+            if self.prune_sg:
+                translationDict['searchGraph'] = self.prune_search_graph(result['sg'])
+            else:
+                translationDict['searchGraph'] = result['sg']
         if 'topt' in result:
             translationDict['topt'] = result['topt']
         if 'align' in result:
@@ -420,7 +452,8 @@ class Root(object):
 
 
         data = {"data" : {"translations" : [translationDict]}}
-        self.log("The server is returning: %s" %self._dump_json(data))
+        #self.log("The server is returning: %s" %self._dump_json(data))
+        self.log("The server is returning:")
         return self._dump_json(data)
 
     @cherrypy.expose
@@ -562,7 +595,7 @@ if __name__ == "__main__":
 
     if args.logprefix:
         init_log("%s.trans.log" %args.logprefix)
-
+    sys.stderr.write(str(args))
     sys.stderr.write("loading external source processors ...\n")
     external_processors = ExternalProcessors(args.tokenizer, args.truecaser,
                                           args.prepro, args.annotators,
@@ -591,9 +624,16 @@ if __name__ == "__main__":
                             'server.socket_host': args.ip})
     cherrypy.config.update({'error_page.default': json_error})
     cherrypy.config.update({'log.screen': True})
+    
+    ##Adding gzup compression
+    cherrypy.config.update({"tools.gzip.on":True})
+    cherrypy.config.update({"tools.gzip.mime_types":['application/json']})
+    
     if args.logprefix:
         cherrypy.config.update({'log.access_file': "%s.access.log" %args.logprefix,
                                 'log.error_file': "%s.error.log" %args.logprefix})
+    
+    
     cherrypy.quickstart(Root(args.moses_url,
                              external_processors = external_processors,
                              tgt_external_processors = tgt_external_processors,
